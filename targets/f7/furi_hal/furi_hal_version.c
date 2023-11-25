@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <ble/ble.h>
+#include "applications/services/storage/storage.h"
 
 #define TAG "FuriHalVersion"
 
@@ -266,8 +267,40 @@ uint32_t furi_hal_version_get_hw_timestamp() {
     return furi_hal_version.timestamp;
 }
 
-const char* furi_hal_version_get_name_ptr() {
-    return *furi_hal_version.name == 0x00 ? NULL : furi_hal_version.name;
+#define MAX_NAME_LENGTH 25
+#define FILENAME "/ext/dolphin/dolphin_name.txt"
+const char* furi_hal_version_get_name_ptr(){
+    Storage* storage = furi_record_open(RECORD_STORAGE);
+    File* file = storage_file_alloc(storage);
+    storage_file_open(file, FILENAME, FSAM_READ, FSOM_OPEN_EXISTING);
+    if (storage_file_is_open(file)){
+        static char temp_name[MAX_NAME_LENGTH] = {'\0'};
+        uint16_t bytesRead = storage_file_read(file, temp_name, sizeof(temp_name)-1);
+        if (bytesRead == 0) {
+            storage_file_close(file);
+            storage_file_free(file);
+            furi_record_close(RECORD_STORAGE);
+            return *furi_hal_version.name == 0x00 ? NULL : furi_hal_version.name; 
+        }
+        temp_name[bytesRead] = '\0';
+        int nameLength = 1;
+        if(strlen(temp_name) != 0){
+            nameLength = strlen(temp_name) + 1;
+        } 
+        static char *name = (char *)malloc(nameLength * sizeof(char));
+        for (i=0; i < nameLength; i++) {
+            name[i] = temp_name[i]; 
+        }
+        name[nameLength] = '\0';
+        storage_file_close(file);
+        storage_file_free(file);
+        furi_record_close(RECORD_STORAGE);
+        return name;
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    furi_record_close(RECORD_STORAGE);
+    return *furi_hal_version.name == 0x00 ? NULL : furi_hal_version.name; 
 }
 
 const char* furi_hal_version_get_device_name_ptr() {
